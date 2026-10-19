@@ -163,3 +163,17 @@ test('remote download imports to local storage without selecting or replacing Bu
   assert.deepEqual(snapshot.selected, { kind: 'built-in' });
   assert.equal(snapshot.bundles.length, 1);
 });
+
+test('rejects a misleading update descriptor before registering downloaded files', async t => {
+  const { options } = await fixture(t);
+  const update = archive('actual');
+  const advertised = archive('advertised');
+  const request: typeof fetch = async input => String(input).includes('feed')
+    ? Response.json({ manifest: advertised.manifest, url: 'https://updates.example/bundle.zip', sha256: createHash('sha256').update(update.bytes).digest('hex') })
+    : new Response(update.bytes);
+  const store = new ElectronUpdates({ ...options, updateUrl: 'https://updates.example/feed', request });
+  await store.initialize();
+  await store.checkForUpdate();
+  await assert.rejects(store.fetchUpdate(), /does not match/);
+  assert.equal((await store.snapshot()).bundles.length, 0);
+});

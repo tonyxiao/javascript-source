@@ -40,6 +40,11 @@ export interface LaunchTarget {
 }
 const MAX_BUNDLE_BYTES = 256 * 1024 * 1024;
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+const manifestIdentity = (m: BundleManifest) => JSON.stringify({
+  formatVersion: m.formatVersion, id: m.id, version: m.version, platform: m.platform,
+  runtimeVersion: m.runtimeVersion, launchAsset: m.launchAsset,
+  assets: Object.entries(m.assets).sort(([a], [b]) => a.localeCompare(b)),
+});
 const sameSource = (a: JavaScriptSource, b: JavaScriptSource) => JSON.stringify(a) === JSON.stringify(b);
 
 /** One instance per native main process. All mutations are serialized and state writes are atomic. */
@@ -212,7 +217,7 @@ export class ElectronUpdates implements JavaScriptSourceClient {
     if (!stat.isFile() || stat.size > MAX_BUNDLE_BYTES) throw new Error('Select a bundle ZIP smaller than 256 MB.');
     return this.importArchive(new Uint8Array(await readFile(file)));
   }
-  async importArchive(archive: Uint8Array): Promise<BundleManifest> {
+  async importArchive(archive: Uint8Array, expectedManifest?: BundleManifest): Promise<BundleManifest> {
     return this.mutate(async () => {
       this.assertInitialized();
       if (archive.byteLength > MAX_BUNDLE_BYTES) throw new Error('Bundle exceeds size limit.');
@@ -226,11 +231,12 @@ export class ElectronUpdates implements JavaScriptSourceClient {
       if (!metadata) throw new Error(`Bundle ZIP must contain ${BUNDLE_MANIFEST_FILE}.`);
       const manifest = parseManifest(JSON.parse(new TextDecoder().decode(metadata)));
       assertCompatible(this.runtime, manifest);
+      if (expectedManifest && manifestIdentity(manifest) !== manifestIdentity(expectedManifest)) throw new Error('Downloaded manifest does not match the update descriptor.');
       if (manifest.platform === 'electron' && manifest.launchAsset !== 'index.html') throw new Error('Electron bundles must launch index.html.');
       await this.options.verifyManifest?.(manifest);
       const existing = this.state.bundles.find(b => b.manifest.id === manifest.id);
       if (existing) {
-        if (JSON.stringify(existing.manifest) !== JSON.stringify(manifest)) throw new Error('Bundle IDs are immutable. Use a new ID for different contents.');
+        if (manifestIdentity(existing.manifest) !== manifestIdentity(manifest)) throw new Error('Bundle IDs are immutable. Use a new ID for different contents.');
         return manifest;
       }
       if (Object.keys(files).some(name => name !== BUNDLE_MANIFEST_FILE && !Object.hasOwn(manifest.assets, name))) throw new Error('Archive contains unlisted files.');
@@ -301,8 +307,7 @@ export class ElectronUpdates implements JavaScriptSourceClient {
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     if (sha256(bytes) !== update.sha256) throw new Error('Bundle download checksum mismatch.');
     // Descriptor and archive must agree, even when the feed returns misleading metadata.
-    const manifest = await this.importArchive(bytes);
-    if (JSON.stringify(manifest) !== JSON.stringify(update.manifest)) throw new Error('Downloaded manifest does not match the update descriptor.');
+    await this.importArchive(bytes, update.manifest);
   }
 }
 
