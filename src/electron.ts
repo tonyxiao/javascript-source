@@ -16,6 +16,7 @@ interface StoreState {
   pending: { token: string; source: JavaScriptSource } | null;
   bundles: BundleRecord[];
   recoveryReason: string | null;
+  followDevelopmentServerDefault?: boolean;
 }
 export interface ElectronUpdatesOptions {
   /** Must be outside the signed app, normally under app.getPath('userData'). */
@@ -80,7 +81,7 @@ export class ElectronUpdates implements JavaScriptSourceClient {
     const selected: JavaScriptSource = this.options.initialSource ?? (this.options.defaultDevelopmentServerUrl
       ? { kind: 'development-server', url: normalizeDevelopmentServerUrl(this.options.defaultDevelopmentServerUrl) }
       : { kind: 'built-in' });
-    return { version: 1, selected, lastSuccessful: { kind: 'built-in' }, pending: null, bundles: [], recoveryReason: null };
+    return { version: 1, selected, followDevelopmentServerDefault: !this.options.initialSource && !!this.options.defaultDevelopmentServerUrl, lastSuccessful: { kind: 'built-in' }, pending: null, bundles: [], recoveryReason: null };
   }
   async initialize(): Promise<void> {
     return this.mutate(async () => {
@@ -100,14 +101,18 @@ export class ElectronUpdates implements JavaScriptSourceClient {
           // A user selection made after this failed launch must still win.
           if (sameSource(this.state.selected, failed)) this.state.selected = sameSource(this.state.lastSuccessful, failed) ? { kind: 'built-in' } : this.state.lastSuccessful;
           this.state.pending = null;
+          this.state.followDevelopmentServerDefault = false;
           this.state.recoveryReason = 'The previous JavaScript source did not confirm startup; restored the last working source.';
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
           // Preserve corrupt state for diagnosis while guaranteeing an offline escape hatch.
           await rename(path.join(this.options.directory, 'state.json'), path.join(this.options.directory, `state-invalid-${randomUUID()}.json`)).catch(() => {});
-          this.state = { ...this.initialState(), selected: { kind: 'built-in' }, recoveryReason: 'Invalid update state; restored Built-in.' };
+          this.state = { ...this.initialState(), selected: { kind: 'built-in' }, followDevelopmentServerDefault: false, recoveryReason: 'Invalid update state; restored Built-in.' };
         } else this.state = this.initialState();
+      }
+      if (this.state.followDevelopmentServerDefault && this.options.defaultDevelopmentServerUrl) {
+        this.state.selected = { kind: 'development-server', url: normalizeDevelopmentServerUrl(this.options.defaultDevelopmentServerUrl) };
       }
       this.initialized = true;
       await this.persist();
@@ -132,6 +137,7 @@ export class ElectronUpdates implements JavaScriptSourceClient {
       const source = parseSource(input);
       await this.validateSource(source);
       this.state.selected = source;
+      this.state.followDevelopmentServerDefault = source.kind === 'development-server' && !!this.options.defaultDevelopmentServerUrl && source.url === normalizeDevelopmentServerUrl(this.options.defaultDevelopmentServerUrl);
       // Intentional selection is independent of any unacknowledged old renderer.
       this.state.pending = null;
       await this.persist();
@@ -139,7 +145,8 @@ export class ElectronUpdates implements JavaScriptSourceClient {
   }
   private async validateSource(source: JavaScriptSource): Promise<void> {
     if (source.kind === 'built-in') {
-      if (!(await lstat(path.join(this.options.builtInDirectory, 'index.html'))).isFile()) throw new Error('Built-in frontend is unavailable. Build the renderer before selecting Built-in.');
+      const exists = await lstat(path.join(this.options.builtInDirectory, 'index.html')).then(stat => stat.isFile(), () => false);
+      if (!exists) throw new Error('Built-in frontend is unavailable. Build the renderer before selecting Built-in.');
     } else if (source.kind === 'bundle') {
       const record = this.state.bundles.find(b => b.manifest.id === source.bundleId);
       if (!record) throw new Error('Saved bundle not found.');
@@ -168,6 +175,7 @@ export class ElectronUpdates implements JavaScriptSourceClient {
         await this.validateSource(source);
         this.state.recoveryReason = error instanceof Error ? error.message : String(error);
         this.state.selected = source;
+        this.state.followDevelopmentServerDefault = false;
       }
       this.current = source;
       const token = source.kind === 'built-in' ? null : randomUUID();
@@ -202,6 +210,7 @@ export class ElectronUpdates implements JavaScriptSourceClient {
       }
       this.state.selected = sameSource(this.state.lastSuccessful, failed) ? { kind: 'built-in' } : this.state.lastSuccessful;
       this.state.pending = null;
+      this.state.followDevelopmentServerDefault = false;
       this.state.recoveryReason = 'JavaScript startup failed; restored the last working source.';
       await this.persist();
       return true;

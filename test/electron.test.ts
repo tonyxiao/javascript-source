@@ -177,3 +177,19 @@ test('rejects a misleading update descriptor before registering downloaded files
   await assert.rejects(store.fetchUpdate(), /does not match/);
   assert.equal((await store.snapshot()).bundles.length, 0);
 });
+
+test('runner defaults follow a changed port while explicit server selections remain pinned', async t => {
+  const { options } = await fixture(t, 'http://127.0.0.1:5000/');
+  const request: typeof fetch = async () => Response.json({ platform: 'electron', runtimeVersion: 'native-v1' });
+  const first = new ElectronUpdates({ ...options, request });
+  await first.initialize();
+  await first.notifyAppReady((await first.prepareLaunch()).token!);
+  const changed = new ElectronUpdates({ ...options, defaultDevelopmentServerUrl: 'http://127.0.0.1:5001/', request });
+  await changed.initialize();
+  assert.equal((await changed.prepareLaunch()).serverUrl, 'http://127.0.0.1:5001/');
+  await changed.select({ kind: 'development-server', url: 'http://100.100.100.100:9000' });
+  await changed.notifyAppReady((await changed.prepareLaunch()).token!);
+  const again = new ElectronUpdates({ ...options, defaultDevelopmentServerUrl: 'http://127.0.0.1:5002/', request });
+  await again.initialize();
+  assert.equal((await again.prepareLaunch()).serverUrl, 'http://100.100.100.100:9000/');
+});
