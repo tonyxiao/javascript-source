@@ -134,3 +134,32 @@ test('cannot delete active or recovery bundles; deleting an unused bundle is per
   await store.deleteBundle('b');
   assert.deepEqual((await store.snapshot()).bundles.map(b => b.id), ['a']);
 });
+
+test('packing includes copied public assets and produces an importable bundle', async t => {
+  const { packBundle } = await import('../dist/electron.js');
+  const { store, root } = await fixture(t);
+  const source = path.join(root, 'renderer-build');
+  await mkdir(source);
+  await writeFile(path.join(source, 'index.html'), '<html>App</html>');
+  await writeFile(path.join(source, 'public-image.svg'), '<svg/>');
+  const bytes = await packBundle(source, { runtimeVersion: 'native-v1', version: '1.0' });
+  const manifest = await store.importArchive(bytes);
+  assert.ok(manifest.assets['public-image.svg']);
+  await store.select({ kind: 'bundle', bundleId: manifest.id });
+  assert.equal((await store.prepareLaunch()).source.kind, 'bundle');
+});
+
+test('remote download imports to local storage without selecting or replacing Built-in', async t => {
+  const { options } = await fixture(t);
+  const update = archive();
+  const request: typeof fetch = async input => String(input).includes('feed')
+    ? Response.json({ manifest: update.manifest, url: 'https://updates.example/bundle.zip', sha256: createHash('sha256').update(update.bytes).digest('hex') })
+    : new Response(update.bytes);
+  const store = new ElectronUpdates({ ...options, updateUrl: 'https://updates.example/feed', request });
+  await store.initialize();
+  assert.equal((await store.checkForUpdate())?.id, 'a');
+  await store.fetchUpdate();
+  const snapshot = await store.snapshot();
+  assert.deepEqual(snapshot.selected, { kind: 'built-in' });
+  assert.equal(snapshot.bundles.length, 1);
+});

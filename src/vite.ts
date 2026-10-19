@@ -28,7 +28,7 @@ export function javascriptSourceUpdates(options: SourceUpdatesPluginOptions) {
         const content = item.type === 'chunk' ? item.code : item.source;
         if (content !== undefined) assets[name] = createHash('sha256').update(content).digest('hex');
       }
-      const contentId = createHash('sha256').update(JSON.stringify({ runtimeVersion: options.runtimeVersion, assets })).digest('hex');
+      const contentId = createHash('sha256').update(JSON.stringify({ runtimeVersion: options.runtimeVersion, version: options.version, assets })).digest('hex');
       const manifest: BundleManifest = {
         formatVersion: 1, platform: 'electron', runtimeVersion: options.runtimeVersion,
         id: options.id ?? contentId, version: options.version, launchAsset: 'index.html', assets,

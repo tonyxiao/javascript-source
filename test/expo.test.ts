@@ -31,3 +31,21 @@ test('Expo rejects incompatible manifests and checks Metro before asking native 
   await assert.rejects(native.select({ kind: 'development-server', url: 'http://100.100.100.100:8081' }), /Incompatible/);
   assert.equal(selected, false);
 });
+
+test('launcher adapter reloads Built-in or Metro without claiming saved-bundle management', async () => {
+  const { createExpoLauncherController } = await import('../dist/expo.js');
+  const calls: string[] = [];
+  const controller = createExpoLauncherController({
+    getSourceInfo: () => ({ runtimeVersion: 'native-v1', serverUrl: 'http://100.100.100.100:8081/index.bundle' }),
+    loadApp: async url => { calls.push(url); },
+    loadEmbeddedBundle: async () => { calls.push('built-in'); },
+  }, engine());
+  assert.deepEqual((await controller.snapshot()).current, { kind: 'development-server', url: 'http://100.100.100.100:8081/' });
+  await controller.select({ kind: 'built-in' });
+  await controller.reload();
+  await controller.select({ kind: 'development-server', url: 'http://100.100.100.100:8082' });
+  await controller.reload();
+  assert.deepEqual(calls, ['built-in', 'http://100.100.100.100:8082/']);
+  assert.equal(controller.managesSavedBundles, false);
+  await assert.rejects(controller.select({ kind: 'bundle', bundleId: 'a' }), /manual saved-bundle/);
+});

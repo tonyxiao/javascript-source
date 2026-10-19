@@ -133,7 +133,9 @@ export class ElectronUpdates implements JavaScriptSourceClient {
     });
   }
   private async validateSource(source: JavaScriptSource): Promise<void> {
-    if (source.kind === 'bundle') {
+    if (source.kind === 'built-in') {
+      if (!(await lstat(path.join(this.options.builtInDirectory, 'index.html'))).isFile()) throw new Error('Built-in frontend is unavailable. Build the renderer before selecting Built-in.');
+    } else if (source.kind === 'bundle') {
       const record = this.state.bundles.find(b => b.manifest.id === source.bundleId);
       if (!record) throw new Error('Saved bundle not found.');
       assertCompatible(this.runtime, record.manifest);
@@ -158,6 +160,7 @@ export class ElectronUpdates implements JavaScriptSourceClient {
       catch (error) {
         source = this.state.lastSuccessful;
         try { await this.validateSource(source); } catch { source = { kind: 'built-in' }; }
+        await this.validateSource(source);
         this.state.recoveryReason = error instanceof Error ? error.message : String(error);
         this.state.selected = source;
       }
@@ -324,7 +327,7 @@ export async function packBundle(directory: string, options: { runtimeVersion: s
   }
   await walk('');
   const assets = Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, sha256(bytes)]));
-  const id = options.id ?? sha256(new TextEncoder().encode(JSON.stringify({ runtimeVersion: options.runtimeVersion, assets })));
+  const id = options.id ?? sha256(new TextEncoder().encode(JSON.stringify({ runtimeVersion: options.runtimeVersion, version: options.version, assets })));
   const manifest = parseManifest({ formatVersion: 1, platform: 'electron', runtimeVersion: options.runtimeVersion,
     id, version: options.version, launchAsset: 'index.html', assets });
   files[BUNDLE_MANIFEST_FILE] = new TextEncoder().encode(JSON.stringify(manifest));
