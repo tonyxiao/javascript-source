@@ -17,6 +17,7 @@ export interface ExpoUpdatesEngine {
 
 /** Native launcher integration is explicitly separate from expo-updates' production update engine. */
 export interface ExpoSourceController {
+  readonly managesSavedBundles?: boolean;
   snapshot(): Promise<{
     current: JavaScriptSource;
     selected: JavaScriptSource;
@@ -54,7 +55,7 @@ export function createExpoUpdatesClient(options: ExpoUpdatesOptions): JavaScript
         defaultDevelopmentServerUrl: options.defaultDevelopmentServerUrl ?? null,
         capabilities: {
           importBundle: false,
-          manageBundles: !!options.sourceController,
+          manageBundles: options.sourceController?.managesSavedBundles === true,
           developmentServer: !!options.sourceController,
           automaticUpdates: engine.isEnabled,
         },
@@ -91,6 +92,38 @@ export function createExpoUpdatesClient(options: ExpoUpdatesOptions): JavaScript
       const result = await engine.fetchUpdateAsync() as { isNew?: boolean; manifest?: { id?: string }; isRollBackToEmbedded?: boolean };
       if (result.isRollBackToEmbedded) pending = { kind: 'built-in' };
       else if (result.manifest?.id) pending = { kind: 'bundle', bundleId: result.manifest.id };
+    },
+  };
+}
+
+/** Optional native extension to Expo's existing launcher; no UI assumptions. */
+export interface ExpoLauncherBridge {
+  getSourceInfo(): { runtimeVersion: string; serverUrl: string | null };
+  loadApp(url: string): Promise<unknown>;
+  loadEmbeddedBundle(): Promise<unknown>;
+}
+
+export function createExpoLauncherController(launcher: ExpoLauncherBridge, engine: ExpoUpdatesEngine): ExpoSourceController {
+  let selected: JavaScriptSource | null = null;
+  const current = (): JavaScriptSource => {
+    const info = launcher.getSourceInfo();
+    if (info.serverUrl) return { kind: 'development-server', url: new URL(info.serverUrl).origin + '/' };
+    if (!engine.isEmbeddedLaunch && engine.updateId) return { kind: 'bundle', bundleId: engine.updateId };
+    return { kind: 'built-in' };
+  };
+  return {
+    managesSavedBundles: false,
+    async snapshot() { const running = current(); return { current: running, selected: selected ?? running, bundles: [], recoveryReason: null }; },
+    async select(input) {
+      const source = parseSource(input);
+      if (source.kind === 'bundle') throw new Error('This Expo launcher does not expose manual saved-bundle selection.');
+      selected = source;
+    },
+    async reload() {
+      const source = selected ?? current();
+      if (source.kind === 'development-server') await launcher.loadApp(source.url);
+      else if (source.kind === 'built-in') await launcher.loadEmbeddedBundle();
+      else await engine.reloadAsync();
     },
   };
 }

@@ -113,7 +113,9 @@ export function parseSource(value: unknown): JavaScriptSource {
 
 /** The same preflight can be used by Metro and Vite adapters, before executing remote JS. */
 export async function checkDevelopmentServer(url: string, runtime: RuntimeIdentity, request: typeof fetch = fetch): Promise<void> {
-  const response = await request(new URL(DEVELOPMENT_MANIFEST_PATH, normalizeDevelopmentServerUrl(url)), {
+  const metadataUrl = new URL(DEVELOPMENT_MANIFEST_PATH, normalizeDevelopmentServerUrl(url));
+  metadataUrl.searchParams.set('platform', runtime.platform);
+  const response = await request(metadataUrl, {
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error(`Development server compatibility check failed (${response.status}).`);
