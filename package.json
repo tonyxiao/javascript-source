@@ -1,0 +1,33 @@
+{
+  "name": "@tonyxiao/javascript-source-updates",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Headless JavaScript source selection and updates for Electron and Expo",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./dist/core.js",
+    "./electron": "./dist/electron.js",
+    "./expo": "./dist/expo.js",
+    "./vite": "./dist/vite.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --experimental-strip-types --test test/*.test.ts",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}
