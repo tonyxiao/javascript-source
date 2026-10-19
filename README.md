@@ -1,93 +1,38 @@
-# JavaScript Updates
+# JavaScript Source
 
-Headless JavaScript source selection for Electron and Expo. The client owns its UI and decides when to flush state and restart. Switching or importing JavaScript never rewrites the signed application.
+Headless JavaScript source selection and updates for Electron and Expo. Applications own the UI and decide when to flush state and restart.
 
-- **Built-in**: the original bundle in the installed application.
-- **Saved bundles**: immutable compatible bundles in application data.
-- **Development server**: a live origin with a runtime compatibility preflight.
+This monorepo contains two packages:
+
+- [`@tonyxiao/javascript-source`](packages/javascript-source): platform-neutral contracts, compatibility preflight, and an adapter over Expo Updates and an optional native launcher.
+- [`@tonyxiao/electron-updates`](packages/electron-updates): Electron bundle storage, ZIP import/download, startup recovery, and Vite integration. Implements the shared `JavaScriptSourceClient` interface.
+
+**Built-in** is the original JavaScript shipped with the app. **Saved bundles** are compatible versions stored in application data. **Development server** loads live JavaScript after checking native compatibility. These operations never rewrite the signed app. Native upgrades retain saved bundles; incompatible versions cannot launch.
 
 ## Install
 
-On the tailnet:
+On the tailnet, configure the `@tonyxiao` scope to use `https://npm.meteor-ruffe.ts.net/`, then:
 
 ```sh
-npm install @tonyxiao/javascript-updates --registry=https://npm.meteor-ruffe.ts.net/
+# Electron
+npm install @tonyxiao/javascript-source @tonyxiao/electron-updates
+# Expo (use the expo-updates version matching the application's Expo SDK)
+npm install @tonyxiao/javascript-source
+npx expo install expo-updates
 ```
 
-Public CI and cloud builders can install the same built package without Tailscale:
+`electron-updates` uses `javascript-source` as a peer dependency so the host chooses one shared protocol version. The common package has no Node, Electron, React, or Expo runtime dependency; the Expo adapter accepts the installed SDK module.
+
+Public builders without Tailscale can install the built release artifacts together:
 
 ```sh
-npm install https://github.com/tonyxiao/javascript-updates/releases/download/v0.1.0/tonyxiao-javascript-updates-0.1.0.tgz
+npm install \
+  https://github.com/tonyxiao/javascript-source/releases/download/v0.2.0/tonyxiao-javascript-source-0.2.0.tgz \
+  https://github.com/tonyxiao/javascript-source/releases/download/v0.2.0/tonyxiao-electron-updates-0.2.0.tgz
 ```
 
-The source repository is public. The registry is optional; no Git dependency or install-time build is needed when using the release tarball.
-
-## Entry points
-
-- `@tonyxiao/javascript-updates`: shared source, snapshot, capability, and manifest contracts. No platform imports.
-- `/electron`: filesystem-backed bundle storage, ZIP import/download, source selection, checksums, startup acknowledgements and rollback.
-- `/expo`: an adapter around `expo-updates`. Pass the installed SDK module instead of adding another Expo dependency. Explicit source selection requires a native `ExpoSourceController`; production Expo Updates alone does not expose an arbitrary saved-bundle picker or disk import.
-- `/vite`: development metadata and build-manifest plugin.
-
-## Electron
-
-```ts
-const updates = new ElectronUpdates({
-  directory: path.join(app.getPath('userData'), 'javascript-source-updates'),
-  builtInDirectory: path.join(app.getAppPath(), 'web'),
-  runtimeVersion: 'my-native-bridge-v1',
-  defaultDevelopmentServerUrl: process.env.VITE_DEV_SERVER_URL,
-  reload: async () => { app.relaunch(); app.quit(); },
-});
-await updates.initialize();
-const launch = await updates.prepareLaunch();
-// Serve launch.assetDirectory through the application's existing custom protocol,
-// or proxy launch.serverUrl. Keep the same origin and preload bridge.
-// After the client actually mounts, acknowledge the token through host IPC:
-await updates.notifyAppReady(launch.token);
-```
-
-Only call `notifyAppReady` when there is a non-null token. On a startup crash or ready timeout, call `failLaunch(token)` and restart if it returns true. If the process exits before acknowledgement, the next initialize rolls back automatically. Built-in is the final offline recovery target. This is startup recovery, not a guarantee of recovery from every later application error.
-
-`select` persists a next source; it does not restart or discard drafts. `snapshot` distinguishes the currently running source from the selected source. An explicit selection overrides the dev runner default. `resetDevelopmentServer` restores that default. An unavailable or incompatible server falls back to the last working source or Built-in.
-
-## Bundle format
-
-A ZIP contains `source-update.json` and every listed file. The manifest contains:
-
-```json
-{
-  "formatVersion": 1,
-  "id": "release-123",
-  "version": "1.2.3",
-  "platform": "electron",
-  "runtimeVersion": "my-native-bridge-v1",
-  "launchAsset": "index.html",
-  "assets": { "index.html": "<64-character SHA-256>" }
-}
-```
-
-IDs are immutable. Archives must contain all assets with matching hashes; traversal and oversized archives are rejected. Bundle storage is separate from the installed application. Native upgrades retain saved bundles but incompatible bundles cannot launch. The host defines its native runtime compatibility identifier and changes it when the bridge or required native capabilities change. A hash is useful only if the inputs represent the actual native build contract.
-
-Use `packBundle(directory, { runtimeVersion, version })` from `/electron` to create an archive from a built renderer, including copied public assets. The `/vite` plugin advertises `/.well-known/javascript-source.json` and emits a manifest for generated assets; packing recomputes the full manifest. Serve equivalent metadata from Metro before enabling strict preflight there.
-
-## Remote updates
-
-Set `updateUrl` to a feed returning `{ manifest, url, sha256 }`. `checkForUpdate` validates runtime compatibility; `fetchUpdate` downloads and imports without activating. The host chooses polling, channel/feed URL, and whether to select/restart automatically. No scheduler or hosted service is required. Downloaded bundles launch offline. Checksums detect corruption; use `verifyManifest` for an application-specific authenticity policy. A feed is executable-code distribution and must be trusted by the host.
-
-## Expo
-
-```ts
-import * as Updates from 'expo-updates';
-const client = createExpoUpdatesClient({ updates: Updates, platform: 'ios' });
-const available = await client.checkForUpdate();
-if (available) await client.fetchUpdate();
-// After flushing drafts, when the client permits a restart:
-await client.reload();
-```
-
-Expo owns its cache, runtime-version filtering, and recovery. The adapter does not modify Expo's database or claim that its cache is a user-managed bundle library. Capabilities explicitly report the missing operations. In a development client, production update methods may be unavailable; use the native source-controller extension for Metro and manual Built-in recovery. The same runtime preflight helper is available to both platforms.
+Mobile needs only the first artifact. Release artifacts contain compiled JavaScript and types; installation needs no Git checkout or build step.
 
 ## Development
 
-`npm ci`, `npm test`, `npm run typecheck`. Git installs build through `prepare`; releases should publish the built package. No React, Electron runtime, or Expo dependency is loaded by the core entry point.
+`npm ci`, `npm test`, `npm run typecheck`. Build order is contracts first, Electron second. Tests cover both engines and install the packed packages into an independent consumer to exercise exports and offline recovery.

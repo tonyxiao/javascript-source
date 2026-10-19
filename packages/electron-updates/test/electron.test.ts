@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { zipSync, strToU8 } from 'fflate';
-import { ElectronUpdates } from '../dist/electron.js';
-import { checkDevelopmentServer } from '../dist/core.js';
+import { ElectronUpdates } from '@tonyxiao/electron-updates';
+import { checkDevelopmentServer } from '@tonyxiao/javascript-source';
 
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 function archive(id = 'a', runtimeVersion = 'native-v1', content = '<html>A</html>') {
@@ -136,7 +136,7 @@ test('cannot delete active or recovery bundles; deleting an unused bundle is per
 });
 
 test('packing includes copied public assets and produces an importable bundle', async t => {
-  const { packBundle } = await import('../dist/electron.js');
+  const { packBundle } = await import('@tonyxiao/electron-updates');
   const { store, root } = await fixture(t);
   const source = path.join(root, 'renderer-build');
   await mkdir(source);

@@ -1,27 +1,15 @@
 {
-  "name": "@tonyxiao/javascript-updates",
-  "version": "0.1.0",
+  "name": "javascript-source-monorepo",
+  "private": true,
   "type": "module",
-  "description": "Headless JavaScript source selection and updates for Electron and Expo",
-  "license": "MIT",
-  "files": [
-    "dist",
-    "README.md"
+  "workspaces": [
+    "packages/*"
   ],
-  "exports": {
-    ".": "./dist/core.js",
-    "./electron": "./dist/electron.js",
-    "./expo": "./dist/expo.js",
-    "./vite": "./dist/vite.js"
-  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --experimental-strip-types --test test/*.test.ts",
-    "prepare": "npm run build"
-  },
-  "dependencies": {
-    "fflate": "^0.8.2"
+    "build": "npm run build -w @tonyxiao/javascript-source && npm run build -w @tonyxiao/electron-updates",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run build && npm run test --workspaces && node --test test/*.test.mjs",
+    "pack:release": "npm run build && npm pack --workspaces --pack-destination tmp"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -29,12 +17,5 @@
   },
   "engines": {
     "node": ">=22.18"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/tonyxiao/javascript-updates.git"
-  },
-  "publishConfig": {
-    "registry": "https://npm.meteor-ruffe.ts.net/"
   }
 }

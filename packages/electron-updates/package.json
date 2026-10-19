@@ -1,0 +1,46 @@
+{
+  "version": "0.2.0",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonyxiao/javascript-source.git",
+    "directory": "packages/electron-updates"
+  },
+  "publishConfig": {
+    "registry": "https://npm.meteor-ruffe.ts.net/"
+  },
+  "name": "@tonyxiao/electron-updates",
+  "description": "Headless JavaScript bundle updates, storage, and recovery for Electron",
+  "exports": {
+    ".": {
+      "types": "./dist/electron.d.ts",
+      "import": "./dist/electron.js",
+      "default": "./dist/electron.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.js",
+      "default": "./dist/vite.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "peerDependencies": {
+    "@tonyxiao/javascript-source": "^0.2.0"
+  }
+}

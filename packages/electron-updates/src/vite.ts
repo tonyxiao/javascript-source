@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { BUNDLE_MANIFEST_FILE, DEVELOPMENT_MANIFEST_PATH, type BundleManifest } from './core.js';
+import { BUNDLE_MANIFEST_FILE, DEVELOPMENT_MANIFEST_PATH, type BundleManifest } from '@tonyxiao/javascript-source';
 
-export interface SourceUpdatesPluginOptions {
+export interface ElectronUpdatesPluginOptions {
   runtimeVersion: string;
   version: string;
   /** Supply a release ID in CI; otherwise the content hash provides a stable immutable ID. */
@@ -9,9 +9,9 @@ export interface SourceUpdatesPluginOptions {
 }
 
 /** Vite/Rollup-compatible plugin without a dependency on either bundler's runtime. */
-export function javascriptSourceUpdates(options: SourceUpdatesPluginOptions) {
+export function electronUpdates(options: ElectronUpdatesPluginOptions) {
   return {
-    name: 'javascript-source-updates',
+    name: 'electron-updates',
     enforce: 'post' as const,
     configureServer(server: { middlewares: { use: (handler: (req: { url?: string }, res: { setHeader: (key: string, value: string) => void; end: (body: string) => void }, next: () => void) => void) => void } }) {
       server.middlewares.use((req, res, next) => {

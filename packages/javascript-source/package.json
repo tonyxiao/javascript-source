@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonyxiao/javascript-source.git",
+    "directory": "packages/javascript-source"
+  },
+  "publishConfig": {
+    "registry": "https://npm.meteor-ruffe.ts.net/"
+  },
+  "name": "@tonyxiao/javascript-source",
+  "description": "Headless JavaScript source contracts and Expo adapter",
+  "exports": {
+    ".": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "default": "./dist/core.js"
+    },
+    "./expo": {
+      "types": "./dist/expo.d.ts",
+      "import": "./dist/expo.js",
+      "default": "./dist/expo.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  }
+}

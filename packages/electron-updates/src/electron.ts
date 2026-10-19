@@ -6,7 +6,7 @@ import {
   BUNDLE_MANIFEST_FILE, assertCompatible, checkDevelopmentServer, isSafeAssetPath,
   normalizeDevelopmentServerUrl, parseManifest, parseSource,
   type BundleManifest, type JavaScriptSource, type JavaScriptSourceClient, type SourceSnapshot,
-} from './core.js';
+} from '@tonyxiao/javascript-source';
 
 interface BundleRecord { manifest: BundleManifest; status: 'ready' | 'failed' }
 interface StoreState {
