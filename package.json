@@ -1,5 +1,5 @@
 {
-  "name": "@tonyxiao/javascript-source-updates",
+  "name": "@tonyxiao/javascript-updates",
   "version": "0.1.0",
   "type": "module",
   "description": "Headless JavaScript source selection and updates for Electron and Expo",
@@ -29,5 +29,12 @@
   },
   "engines": {
     "node": ">=22.18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonyxiao/javascript-updates.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.meteor-ruffe.ts.net/"
   }
 }

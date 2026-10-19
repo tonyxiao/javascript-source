@@ -1,4 +1,4 @@
-# JavaScript Source Updates
+# JavaScript Updates
 
 Headless JavaScript source selection for Electron and Expo. The client owns its UI and decides when to flush state and restart. Switching or importing JavaScript never rewrites the signed application.
 
@@ -6,9 +6,25 @@ Headless JavaScript source selection for Electron and Expo. The client owns its 
 - **Saved bundles**: immutable compatible bundles in application data.
 - **Development server**: a live origin with a runtime compatibility preflight.
 
+## Install
+
+On the tailnet:
+
+```sh
+npm install @tonyxiao/javascript-updates --registry=https://npm.meteor-ruffe.ts.net/
+```
+
+Public CI and cloud builders can install the same built package without Tailscale:
+
+```sh
+npm install https://github.com/tonyxiao/javascript-updates/releases/download/v0.1.0/tonyxiao-javascript-updates-0.1.0.tgz
+```
+
+The source repository is public. The registry is optional; no Git dependency or install-time build is needed when using the release tarball.
+
 ## Entry points
 
-- `@tonyxiao/javascript-source-updates`: shared source, snapshot, capability, and manifest contracts. No platform imports.
+- `@tonyxiao/javascript-updates`: shared source, snapshot, capability, and manifest contracts. No platform imports.
 - `/electron`: filesystem-backed bundle storage, ZIP import/download, source selection, checksums, startup acknowledgements and rollback.
 - `/expo`: an adapter around `expo-updates`. Pass the installed SDK module instead of adding another Expo dependency. Explicit source selection requires a native `ExpoSourceController`; production Expo Updates alone does not expose an arbitrary saved-bundle picker or disk import.
 - `/vite`: development metadata and build-manifest plugin.
